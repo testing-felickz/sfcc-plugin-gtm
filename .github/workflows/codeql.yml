@@ -59,7 +59,7 @@ jobs:
 
     - name: Rename ISML files to XHTML
       run: |
-        find . -type f -name "*.isml" -exec bash -c 'mv "$1" "${1%.isml}.xhtml"' - '{}' \;      
+        find . -type f -name "*.isml" -exec bash -c 'mv "$1" "${1%.isml}.renamed.xhtml"' - '{}' \;
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -94,3 +94,26 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
+        upload: False
+        output: sarif-results
+
+    - name: Add CodeQL Analysis Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: before-${{matrix.language}}.sarif
+        path: sarif-results/${{matrix.language}}.sarif
+
+    - name: Replace .renamed.xhtml back to .isml in SARIF
+      run: |
+        sed 's/\.renamed\.xhtml/\.isml/g' sarif-results/${{matrix.language}}.sarif > sarif-results/updated-${{matrix.language}}.sarif
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: sarif-results/updated-${{matrix.language}}.sarif
+
+    - name: Add Updated CodeQL Analysis Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: updated-${{matrix.language}}.sarif
+        path: sarif-results/updated-${{matrix.language}}.sarif
