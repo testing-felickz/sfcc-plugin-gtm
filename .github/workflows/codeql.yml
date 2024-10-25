@@ -63,6 +63,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
+      id: init
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
@@ -74,22 +75,6 @@ jobs:
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
 
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-    - if: matrix.build-mode == 'manual'
-      shell: bash
-      run: |
-        echo 'If you are using a "manual" build mode for one or more of the' \
-          'languages you are analyzing, replace this with the commands to build' \
-          'your code, for example:'
-        echo '  make bootstrap'
-        echo '  make release'
-        exit 1
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
@@ -97,23 +82,23 @@ jobs:
         upload: False
         output: sarif-results
 
-    - name: Add CodeQL Analysis Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: before-${{matrix.language}}.sarif
-        path: sarif-results/${{matrix.language}}.sarif
+    - name: Get name of sarif file (javascript-typescript in matrix -> javascript.sarif)
+      run: |
+        CODEQL=${{ steps.init.outputs.codeql-path }}
+        lang=$($CODEQL resolve languages --extractor-include-aliases --format=betterjson | jq -r '.aliases["${{ matrix.language }}"] // "${{ matrix.language }}"')
+        echo "LANGUAGE=$lang" >> $GITHUB_ENV
 
     - name: Replace .renamed.xhtml back to .isml in SARIF
       run: |
-        sed 's/\.renamed\.xhtml/\.isml/g' sarif-results/${{matrix.language}}.sarif > sarif-results/updated-${{matrix.language}}.sarif
+        sed 's/\.renamed\.xhtml/\.isml/g' sarif-results/$LANGUAGE.sarif > sarif-results/updated-$LANGUAGE.sarif
 
     - name: Upload SARIF
       uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: sarif-results/updated-${{matrix.language}}.sarif
+        sarif_file: sarif-results/updated-$LANGUAGE.sarif
 
     - name: Add Updated CodeQL Analysis Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: updated-${{matrix.language}}.sarif
-        path: sarif-results/updated-${{matrix.language}}.sarif
+        name: SARIF
+        path: sarif-results/*.sarif
